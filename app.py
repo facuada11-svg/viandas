@@ -529,15 +529,22 @@ def main() -> None:
             barras(df_f["come_todo"], "Respuesta", "barras_come_todo")
 
         with col_f:
+            st.subheader("¿Qué porcentaje de estudiantes termina la comida?")
+            torta(df_f["come_todo"], "torta_come_todo")
+
+        col_g, col_h = st.columns(2)
+
+        with col_g:
             st.subheader("Cuando come en el colegio, ¿el ambiente le permite comer en tranquilidad?")
             torta(df_f["ambiente_tranquilo"], "torta_ambiente")
 
-        st.subheader("Si no termina de comer, ¿por qué cree que sea?")
-        razones_no_termina = (
-            df_f["razon_no_termina"].dropna().apply(agrupar_razon_no_termina)
-        )
-        barras(razones_no_termina, "Razón", "barras_razon_no_termina",
-               horizontal=True)
+        with col_h:
+            st.subheader("Si no termina de comer, ¿por qué cree que sea?")
+            razones_no_termina = (
+                df_f["razon_no_termina"].dropna().apply(agrupar_razon_no_termina)
+            )
+            barras(razones_no_termina, "Razón", "barras_razon_no_termina",
+                   horizontal=True)
 
     # ---------------- TAB 3 — MERIENDA Y RUTINA DIARIA ----------------
     with tab3:
