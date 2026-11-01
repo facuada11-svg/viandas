@@ -27,7 +27,6 @@ COLORES = ["#4CAF50", "#FF9800", "#2196F3", "#E91E63",
 @st.cache_data(show_spinner=False)
 def cargar_datos(ruta_csv: str) -> pd.DataFrame:
     """Carga el CSV del cuestionario y normaliza las columnas."""
-    # ← FIX: se llama `data` en vez de `df` para no tapar el `df` global
     data = pd.read_csv(ruta_csv, encoding="utf-8-sig")
 
     renombres = {
@@ -45,15 +44,15 @@ def cargar_datos(ruta_csv: str) -> pd.DataFrame:
         "8_Sabs_si_tens_celia": "celiaquia",
         "9_Sabs_si_tens_diabe": "diabetes",
         "10_Coms_la_vianda_qu": "come_vianda",
-        "11_Por_qu_otra_razn_": "razon_otra_comida",
+        "11_Por_qu_otra_razn_": "razon_no_vianda",
         "12_Qu_bebs_durante_e": "bebida",
         "13_Qu_te_gustara_que": "comida_deseada",
-        "14_Cuando_coms_en_el": "come_recreo",
-        "15_Cuando_coms_en_el": "come_fuera_recreo",
-        "16_Si_no_termins_de_": "termina_comida",
-        "17_Sabs_en_qu_moment": "razon_no_termina",
+        "14_Cuando_coms_en_el": "ambiente_tranquilo",
+        "15_Cuando_coms_en_el": "come_todo",
+        "16_Si_no_termins_de_": "razon_no_termina",
+        "17_Sabs_en_qu_moment": "momento_merienda",
         "18_Coms_la_merienda_": "come_merienda",
-        "19_La_hora_de_la_mer": "hora_merienda",
+        "19_La_hora_de_la_mer": "merienda_ayuda_hora",
         "20_Tens_hambre_despu": "hambre_despues",
         "21_Cuntas_veces_coms": "cantidad_comidas",
         "22_Cules_son_esas_co": "cuales_comidas",
@@ -88,7 +87,7 @@ def cargar_datos(ruta_csv: str) -> pd.DataFrame:
         return x.capitalize()
 
     for col in ["come_carne", "come_vegetales", "come_vianda",
-                "come_merienda", "hambre_despues"]:
+                "merienda_ayuda_hora", "come_merienda", "hambre_despues"]:
         if col in data.columns:
             data[col] = data[col].apply(normaliza_si_no)
 
@@ -140,12 +139,12 @@ def main() -> None:
     st.sidebar.header("🔎 Filtros")
 
     grados = sorted(df["grado"].dropna().unique().tolist())
-    grado_sel = st.sidebar.multiselect("Grado", grados, default=grados)
+    grado_sel = st.sidebar.multiselect("¿A qué grado va?", grados, default=grados)
 
     edades = sorted(df["edad"].dropna().unique().tolist())
     if edades:
         rango_edad = st.sidebar.slider(
-            "Edad",
+            "¿Cuántos años tiene?",
             int(min(edades)), int(max(edades)),
             (int(min(edades)), int(max(edades))),
         )
@@ -167,7 +166,6 @@ def main() -> None:
     total = len(df_f)
     edad_prom = df_f["edad"].mean()
 
-    # ← FIX: float(...) explícito evita el union int | Any | Literal[0]
     pct_carne: float = (
         float(df_f["come_carne"].eq("Sí").mean() * 100) if total else 0.0
     )
@@ -211,7 +209,7 @@ def main() -> None:
             fig.update_traces(textinfo="percent+label")
             st.plotly_chart(fig, use_container_width=True)
 
-        st.subheader("Razones por las que NO come carne / vegetales")
+        st.subheader("¿Por qué no come carne / vegetales?")
         razones = pd.concat([
             df_f["razon_no_carne"].dropna().rename("Razón"),
             df_f["razon_no_vegetales"].dropna().rename("Razón"),
@@ -228,7 +226,7 @@ def main() -> None:
         else:
             st.info("No hay datos de razones registradas.")
 
-        st.subheader("Alergias / condiciones declaradas")
+        st.subheader("¿Sabe si tiene celiaquía o diabetes?")
         cond = pd.DataFrame({
             "Condición": ["Celíaco/a", "Diabético/a"],
             "Cantidad": [
@@ -246,7 +244,7 @@ def main() -> None:
         col_a, col_b = st.columns(2)
 
         with col_a:
-            st.subheader("Bebida durante las comidas")
+            st.subheader("¿Qué bebe durante el almuerzo, la merienda y el recreo?")
             vc = df_f["bebida"].value_counts(dropna=False).reset_index()
             vc.columns = ["Bebida", "Cantidad"]
             fig = px.bar(vc, x="Bebida", y="Cantidad",
@@ -255,7 +253,7 @@ def main() -> None:
             st.plotly_chart(fig, use_container_width=True)
 
         with col_b:
-            st.subheader("Comida que le gustaría que traigan")
+            st.subheader("¿Qué le gustaría que se incluya en las viandas?")
             comidas = (
                 df_f["comida_deseada"]
                 .dropna()
@@ -270,7 +268,7 @@ def main() -> None:
                          text="Cantidad")
             st.plotly_chart(fig, use_container_width=True)
 
-        st.subheader("¿Come la vianda que trae?")
+        st.subheader("¿Come la vianda que le da el colegio?")
         vc = df_f["come_vianda"].value_counts(dropna=False).reset_index()
         vc.columns = ["Respuesta", "Cantidad"]
         fig = px.pie(vc, names="Respuesta", values="Cantidad",
@@ -282,33 +280,51 @@ def main() -> None:
         col_a, col_b = st.columns(2)
 
         with col_a:
-            st.subheader("¿Come durante el recreo?")
-            vc = df_f["come_recreo"].value_counts(dropna=False).reset_index()
+            st.subheader("¿El ambiente le permite comer en tranquilidad?")
+            vc = df_f["ambiente_tranquilo"].value_counts(dropna=False).reset_index()
             vc.columns = ["Respuesta", "Cantidad"]
             fig = px.pie(vc, names="Respuesta", values="Cantidad",
                          color_discrete_sequence=COLORES, hole=0.45)
             st.plotly_chart(fig, use_container_width=True)
 
         with col_b:
-            st.subheader("¿Tiene hambre después de la escuela?")
+            st.subheader("¿Tiene hambre después del colegio?")
             vc = df_f["hambre_despues"].value_counts(dropna=False).reset_index()
             vc.columns = ["Respuesta", "Cantidad"]
             fig = px.pie(vc, names="Respuesta", values="Cantidad",
                          color_discrete_sequence=COLORES, hole=0.45)
             st.plotly_chart(fig, use_container_width=True)
 
-        st.subheader("Cantidad de comidas al día")
+        st.subheader("¿Come todo lo que le sirven?")
+        vc = df_f["come_todo"].value_counts(dropna=False).reset_index()
+        vc.columns = ["Respuesta", "Cantidad"]
+        fig = px.bar(vc, x="Respuesta", y="Cantidad", color="Respuesta",
+                     color_discrete_sequence=COLORES, text="Cantidad")
+        st.plotly_chart(fig, use_container_width=True)
+
+        col_c, col_d = st.columns(2)
+
+        with col_c:
+            st.subheader("¿Come la merienda apenas la sirven?")
+            vc = df_f["come_merienda"].value_counts(dropna=False).reset_index()
+            vc.columns = ["Respuesta", "Cantidad"]
+            fig = px.pie(vc, names="Respuesta", values="Cantidad",
+                         color_discrete_sequence=COLORES, hole=0.45)
+            st.plotly_chart(fig, use_container_width=True)
+
+        with col_d:
+            st.subheader("¿La hora de la merienda le ayuda a saber cuánto falta para irse a casa?")
+            vc = df_f["merienda_ayuda_hora"].value_counts(dropna=False).reset_index()
+            vc.columns = ["Respuesta", "Cantidad"]
+            fig = px.pie(vc, names="Respuesta", values="Cantidad",
+                         color_discrete_sequence=COLORES, hole=0.45)
+            st.plotly_chart(fig, use_container_width=True)
+
+        st.subheader("¿Cuántas veces come al día?")
         vc = df_f["cantidad_comidas"].value_counts(dropna=False).reset_index()
         vc.columns = ["Cantidad", "Frecuencia"]
         fig = px.bar(vc, x="Cantidad", y="Frecuencia", color="Cantidad",
                      color_discrete_sequence=COLORES, text="Frecuencia")
-        st.plotly_chart(fig, use_container_width=True)
-
-        st.subheader("¿Termina la comida?")
-        vc = df_f["termina_comida"].value_counts(dropna=False).reset_index()
-        vc.columns = ["Respuesta", "Cantidad"]
-        fig = px.bar(vc, x="Respuesta", y="Cantidad", color="Respuesta",
-                     color_discrete_sequence=COLORES, text="Cantidad")
         st.plotly_chart(fig, use_container_width=True)
 
         st.subheader("Distribución de edades")
