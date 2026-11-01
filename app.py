@@ -59,6 +59,11 @@ def cargar_datos(ruta_csv: str) -> pd.DataFrame:
     }
     data = data.rename(columns=renombres)
 
+    # Anonimización: se eliminan las columnas que identifican a los niños
+    data = data.drop(
+        columns=[c for c in ["nombre", "uuid", "titulo"] if c in data.columns]
+    )
+
     # Limpieza de texto
     for col in data.select_dtypes(include="object").columns:
         data[col] = (
@@ -280,7 +285,7 @@ def main() -> None:
         col_a, col_b = st.columns(2)
 
         with col_a:
-            st.subheader("¿El ambiente le permite comer en tranquilidad?")
+            st.subheader("Cuando come en el colegio, ¿el ambiente le permite comer en tranquilidad?")
             vc = df_f["ambiente_tranquilo"].value_counts(dropna=False).reset_index()
             vc.columns = ["Respuesta", "Cantidad"]
             fig = px.pie(vc, names="Respuesta", values="Cantidad",
@@ -295,7 +300,7 @@ def main() -> None:
                          color_discrete_sequence=COLORES, hole=0.45)
             st.plotly_chart(fig, use_container_width=True)
 
-        st.subheader("¿Come todo lo que le sirven?")
+        st.subheader("Cuando come en el colegio, ¿come todo lo que le sirven?")
         vc = df_f["come_todo"].value_counts(dropna=False).reset_index()
         vc.columns = ["Respuesta", "Cantidad"]
         fig = px.bar(vc, x="Respuesta", y="Cantidad", color="Respuesta",
@@ -325,13 +330,6 @@ def main() -> None:
         vc.columns = ["Cantidad", "Frecuencia"]
         fig = px.bar(vc, x="Cantidad", y="Frecuencia", color="Cantidad",
                      color_discrete_sequence=COLORES, text="Frecuencia")
-        st.plotly_chart(fig, use_container_width=True)
-
-        st.subheader("Distribución de edades")
-        fig = px.histogram(df_f, x="edad", nbins=8,
-                           color_discrete_sequence=["#2196F3"],
-                           text_auto=True)
-        fig.update_layout(xaxis_title="Edad", yaxis_title="Frecuencia")
         st.plotly_chart(fig, use_container_width=True)
 
     # ---------------- TAB 4 — DATOS CRUDOS ----------------
