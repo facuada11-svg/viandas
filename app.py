@@ -196,6 +196,60 @@ def agrupar_razon_no_termina(texto: str) -> str:
     return t.capitalize()
 
 
+# Verduras que se buscan en las respuestas de "¿Por qué no come vegetales?"
+VERDURAS = {
+    "Papa": r"\bpapas?\b",
+    "Batata": r"\bbatatas?\b",
+    "Lechuga": r"\blechugas?\b",
+    "Zanahoria": r"\bzanahorias?\b",
+    "Morrón": r"\bmorr[oó]n(es)?\b",
+    "Zapallo": r"\bzapallos?\b",
+    "Zapallito": r"\bzapallitos?\b",
+    "Calabaza": r"\bcalabazas?\b",
+    "Tomate": r"\btomates?\b",
+    "Cebolla": r"\bcebollas?\b",
+    "Brócoli": r"\bbr[oó]colis?\b",
+    "Espinaca": r"\bespinacas?\b",
+    "Acelga": r"\bacelgas?\b",
+    "Choclo": r"\bchoclos?\b",
+    "Remolacha": r"\bremolachas?\b",
+    "Pepino": r"\bpepinos?\b",
+    "Berenjena": r"\bberenjenas?\b",
+    "Coliflor": r"\bcoliflor(es)?\b",
+    "Repollo": r"\brepollos?\b",
+    "Arvejas": r"\barvejas?\b",
+}
+
+
+def analizar_verduras(texto: str):
+    """Devuelve (verduras que sí come, verduras que no come) de una respuesta.
+
+    Se asume que una verdura mencionada es una que NO come (la pregunta es
+    "¿por qué no come?"), salvo que la respuesta diga "solo come ...".
+    """
+    t = str(texto).lower()
+    encontradas = [n for n, patron in VERDURAS.items() if re.search(patron, t)]
+    if re.search(r"\bs[oó]lo come|\bsolamente come", t):
+        return encontradas, []
+    return [], encontradas
+
+
+def clasificar_otras_razones(texto: str) -> list:
+    """Agrupa las razones que no son una lista de verduras."""
+    t = str(texto).lower().strip()
+    categorias = []
+    if re.search(r"sabor|textura|se ve|aspecto|olor", t):
+        categorias.append("No le gusta el sabor, la textura o el aspecto")
+    if re.search(r"prefiere|prefiero", t):
+        categorias.append("Prefiere otra comida")
+    if re.search(r"come (un )?poco|poquito", t):
+        categorias.append("Come poco")
+    si, no = analizar_verduras(t)
+    if not categorias and not si and not no:
+        categorias.append(t.rstrip(".").capitalize())
+    return categorias
+
+
 # ============================================================
 # APP
 # ============================================================
@@ -350,7 +404,25 @@ def main() -> None:
             df_f["razon_no_vegetales"].dropna(),
         ])
         if not razones.empty:
-            barras(razones, "Razón", "barras_razones_carne_veg", horizontal=True)
+            verduras_si, verduras_no = [], []
+            for texto in razones:
+                si, no = analizar_verduras(texto)
+                verduras_si += si
+                verduras_no += no
+
+            col_v1, col_v2 = st.columns(2)
+            with col_v1:
+                st.markdown("**Verduras que no come**")
+                barras(pd.Series(verduras_no, dtype="object"), "Verdura",
+                       "barras_verduras_no")
+            with col_v2:
+                st.markdown("**Verduras que sí come** (dicen que solo comen estas)")
+                barras(pd.Series(verduras_si, dtype="object"), "Verdura",
+                       "barras_verduras_si")
+
+            st.markdown("**Otras razones**")
+            otras = razones.apply(clasificar_otras_razones).explode()
+            barras(otras, "Razón", "barras_otras_razones", horizontal=True)
         elif (df_f["come_carne"].eq("Sí").all()
               and df_f["come_vegetales"].eq("Sí").all()):
             st.success("Todos los estudiantes comen carne y vegetales.")
