@@ -20,6 +20,9 @@ from pathlib import Path
 COLORES = ["#4CAF50", "#FF9800", "#2196F3", "#E91E63",
            "#9C27B0", "#00BCD4", "#FFC107", "#795548"]
 
+# Total de estudiantes del curso (uno de ellos no quiso responder el cuestionario)
+TOTAL_CURSO = 12
+
 
 # ============================================================
 # CARGA Y LIMPIEZA DE DATOS
@@ -179,7 +182,11 @@ def main() -> None:
         float(df_f["come_vegetales"].eq("Sí").mean() * 100) if total else 0.0
     )
 
-    c1.metric("Total encuestados", f"{total}")
+    sin_filtros = total == len(df)
+    c1.metric(
+        "Respondieron",
+        f"{total} de {TOTAL_CURSO}" if sin_filtros else f"{total}",
+    )
     c2.metric("Edad promedio", f"{edad_prom:.1f}" if pd.notna(edad_prom) else "—")
     c3.metric("Come carne", f"{pct_carne:.0f}%")
     c4.metric("Come vegetales", f"{pct_veg:.0f}%")
@@ -204,8 +211,12 @@ def main() -> None:
     with col_resumen:
         if total and pd.notna(df_f["edad"].min()):
             grados_txt = ", ".join(sorted(df_f["grado"].dropna().unique()))
+            if sin_filtros:
+                quienes = f"**{total}** de los **{TOTAL_CURSO}** estudiantes de **{grados_txt}** respondieron"
+            else:
+                quienes = f"**{total}** estudiantes de **{grados_txt}**"
             st.markdown(
-                f"**{total}** estudiantes de **{grados_txt}**, "
+                f"{quienes}, "
                 f"de **{int(df_f['edad'].min())}** a **{int(df_f['edad'].max())}** años."
             )
 
