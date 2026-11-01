@@ -183,6 +183,13 @@ def main() -> None:
     c3.metric("Come carne", f"{pct_carne:.0f}%")
     c4.metric("Come vegetales", f"{pct_veg:.0f}%")
 
+    st.subheader("Distribución de edades")
+    fig = px.histogram(df_f, x="edad", nbins=8,
+                       color_discrete_sequence=["#2196F3"],
+                       text_auto=True)
+    fig.update_layout(xaxis_title="Edad", yaxis_title="Frecuencia")
+    st.plotly_chart(fig, use_container_width=True)
+
     st.divider()
 
     # --------------------------------------------------------
