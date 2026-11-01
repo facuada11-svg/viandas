@@ -1,5 +1,4 @@
 # app.py — Alimentación y Rutina de Niños (cuestionario de viandas)
-# app.py — Alimentación y Rutina de Niños (cuestionario de viandas)
 # Ejecutar:  streamlit run app.py
 # Requisitos: streamlit pandas numpy plotly
 #
@@ -189,7 +188,7 @@ def clasificar_comidas(texto: str) -> list:
     t = str(texto).lower()
     encontradas = [nombre for nombre, patron in COMIDAS_DIA.items()
                    if re.search(patron, t)]
-    return encontradas or ["Otras respuestas"]
+    return encontradas
 
 
 def agrupar_razon_no_termina(texto: str) -> str:
