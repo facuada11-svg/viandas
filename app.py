@@ -92,7 +92,8 @@ def cargar_datos(ruta_csv: str) -> pd.DataFrame:
         return x.capitalize()
 
     for col in ["come_carne", "come_vegetales", "come_vianda",
-                "merienda_ayuda_hora", "come_merienda", "hambre_despues"]:
+                "merienda_ayuda_hora", "come_merienda", "hambre_despues",
+                "celiaquia", "diabetes"]:
         if col in data.columns:
             data[col] = data[col].apply(normaliza_si_no)
 
@@ -183,12 +184,30 @@ def main() -> None:
     c3.metric("Come carne", f"{pct_carne:.0f}%")
     c4.metric("Come vegetales", f"{pct_veg:.0f}%")
 
-    st.subheader("Distribución de edades")
-    fig = px.histogram(df_f, x="edad", nbins=8,
-                       color_discrete_sequence=["#2196F3"],
-                       text_auto=True)
-    fig.update_layout(xaxis_title="Edad", yaxis_title="Frecuencia")
-    st.plotly_chart(fig, use_container_width=True)
+    st.subheader("Edades de los participantes")
+    col_edad, col_resumen = st.columns([1, 2])
+
+    with col_edad:
+        edades_vc = (
+            df_f["edad"].dropna().astype(int)
+            .value_counts().sort_index().reset_index()
+        )
+        edades_vc.columns = ["Edad", "Cantidad"]
+        edades_vc["Edad"] = edades_vc["Edad"].astype(str) + " años"
+        fig = px.bar(edades_vc, x="Edad", y="Cantidad", text="Cantidad",
+                     color_discrete_sequence=["#2196F3"])
+        fig.update_layout(height=250, xaxis_title=None,
+                          yaxis=dict(visible=False),
+                          margin=dict(t=10, b=10, l=10, r=10))
+        st.plotly_chart(fig, use_container_width=True)
+
+    with col_resumen:
+        if total and pd.notna(df_f["edad"].min()):
+            grados_txt = ", ".join(sorted(df_f["grado"].dropna().unique()))
+            st.markdown(
+                f"**{total}** estudiantes de **{grados_txt}**, "
+                f"de **{int(df_f['edad'].min())}** a **{int(df_f['edad'].max())}** años."
+            )
 
     st.divider()
 
@@ -239,17 +258,15 @@ def main() -> None:
             st.info("No hay datos de razones registradas.")
 
         st.subheader("¿Sabe si tiene celiaquía o diabetes?")
-        cond = pd.DataFrame({
-            "Condición": ["Celíaco/a", "Diabético/a"],
-            "Cantidad": [
-                df_f["celiaquia"].eq("Sí").sum(),
-                df_f["diabetes"].eq("Sí").sum(),
-            ],
-        })
-        fig = px.bar(cond, x="Condición", y="Cantidad",
-                     color="Condición", color_discrete_sequence=COLORES,
-                     text="Cantidad")
-        st.plotly_chart(fig, use_container_width=True)
+        n_celiaquia = int(df_f["celiaquia"].eq("Sí").sum())
+        n_diabetes = int(df_f["diabetes"].eq("Sí").sum())
+
+        col_c1, col_c2 = st.columns(2)
+        col_c1.metric("Celiaquía", f"{n_celiaquia} de {total}")
+        col_c2.metric("Diabetes", f"{n_diabetes} de {total}")
+
+        if n_celiaquia == 0 and n_diabetes == 0:
+            st.success("Ningún estudiante declaró tener celiaquía ni diabetes.")
 
     # ---------------- TAB 2 — BEBIDAS Y COMIDAS ----------------
     with tab2:
