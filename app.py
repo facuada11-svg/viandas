@@ -8,6 +8,8 @@
 #   └── data/
 #       └── form-1__cuestionario-viandas-y-rutina.csv
 
+import re
+
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -159,6 +161,39 @@ def lista_textos(serie: pd.Series) -> None:
         return
     for v in valores:
         st.markdown(f"- {v}")
+
+
+# Comidas del día: se buscan por raíz de la palabra para juntar variantes
+# ("Desayuno", "desayuna", "Desayuno (a veces xq se duerme)", etc.)
+COMIDAS_DIA = {
+    "Desayuno": r"desay",
+    "Almuerzo": r"almu",
+    "Merienda": r"merie",
+    "Cena": r"\bcen",
+}
+
+
+def clasificar_comidas(texto: str) -> list:
+    """Devuelve qué comidas del día menciona una respuesta (sin repetir)."""
+    t = str(texto).lower()
+    encontradas = [nombre for nombre, patron in COMIDAS_DIA.items()
+                   if re.search(patron, t)]
+    return encontradas or ["Otras respuestas"]
+
+
+def agrupar_razon_no_termina(texto: str) -> str:
+    """Junta respuestas parecidas sobre por qué no termina de comer."""
+    t = str(texto).lower().strip().rstrip(".")
+    if "recuerd" in t or "no sé" in t:
+        return "No recuerda"
+    if "llen" in t:
+        return "Se llena"
+    if "distra" in t or "jug" in t:
+        return "Se distrae jugando"
+    if "gust" in t:
+        return "No le gusta la comida"
+    t = re.sub(r"^porque\s+", "", t)
+    return t.capitalize()
 
 
 # ============================================================
@@ -393,7 +428,11 @@ def main() -> None:
             torta(df_f["ambiente_tranquilo"], "torta_ambiente")
 
         st.subheader("Si no termina de comer, ¿por qué cree que sea?")
-        lista_textos(df_f["razon_no_termina"])
+        razones_no_termina = (
+            df_f["razon_no_termina"].dropna().apply(agrupar_razon_no_termina)
+        )
+        barras(razones_no_termina, "Razón", "barras_razon_no_termina",
+               horizontal=True)
 
     # ---------------- TAB 3 — MERIENDA Y RUTINA DIARIA ----------------
     with tab3:
@@ -428,13 +467,11 @@ def main() -> None:
             comidas_dia = (
                 df_f["cuales_comidas"]
                 .dropna()
-                .str.replace(r"\.$", "", regex=True)
-                .str.split(r"\s*,\s*|\s+y\s+", regex=True)
+                .apply(clasificar_comidas)
                 .explode()
-                .str.strip()
-                .str.capitalize()
             )
             barras(comidas_dia, "Comida", "barras_cuales_comidas")
+            st.caption("Cantidad de estudiantes que mencionan cada comida.")
 
     # ---------------- TAB 4 — DATOS CRUDOS ----------------
     with tab4:
