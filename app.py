@@ -163,6 +163,16 @@ def lista_textos(serie: pd.Series) -> None:
         st.markdown(f"- {v}")
 
 
+def lista_conteo(items: list) -> None:
+    """Lista con viñetas; agrega (n) cuando algo se repite. Para pocos datos."""
+    s = pd.Series(items, dtype="object").dropna()
+    if s.empty:
+        st.caption("Sin respuestas.")
+        return
+    for nombre, n in s.value_counts().items():
+        st.markdown(f"- {nombre}" + (f" ({n})" if n > 1 else ""))
+
+
 # Comidas del día: se buscan por raíz de la palabra para juntar variantes
 # ("Desayuno", "desayuna", "Desayuno (a veces xq se duerme)", etc.)
 COMIDAS_DIA = {
@@ -410,19 +420,24 @@ def main() -> None:
                 verduras_si += si
                 verduras_no += no
 
-            col_v1, col_v2 = st.columns(2)
-            with col_v1:
-                st.markdown("**Verduras que no come**")
-                barras(pd.Series(verduras_no, dtype="object"), "Verdura",
-                       "barras_verduras_no")
-            with col_v2:
-                st.markdown("**Verduras que sí come** (dicen que solo comen estas)")
-                barras(pd.Series(verduras_si, dtype="object"), "Verdura",
-                       "barras_verduras_si")
+            otras = razones.apply(clasificar_otras_razones).explode().dropna()
 
-            st.markdown("**Otras razones**")
-            otras = razones.apply(clasificar_otras_razones).explode()
-            barras(otras, "Razón", "barras_otras_razones", horizontal=True)
+            col_v1, col_v2, col_v3 = st.columns(3)
+            with col_v1:
+                st.markdown("**🥗 Come solo algunas verduras**")
+                st.caption("Las que sí come:")
+                lista_conteo(verduras_si)
+            with col_v2:
+                st.markdown("**🚫 Verduras que no come**")
+                lista_conteo(verduras_no)
+            with col_v3:
+                st.markdown("**💬 Razones que dan**")
+                lista_conteo(otras.tolist())
+
+            st.caption(
+                f"Respuestas escritas por {len(razones)} estudiantes, "
+                "agrupadas por palabras clave."
+            )
         elif (df_f["come_carne"].eq("Sí").all()
               and df_f["come_vegetales"].eq("Sí").all()):
             st.success("Todos los estudiantes comen carne y vegetales.")
