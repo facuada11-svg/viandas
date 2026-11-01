@@ -1,4 +1,5 @@
 # app.py — Alimentación y Rutina de Niños (cuestionario de viandas)
+# app.py — Alimentación y Rutina de Niños (cuestionario de viandas)
 # Ejecutar:  streamlit run app.py
 # Requisitos: streamlit pandas numpy plotly
 #
@@ -203,6 +204,22 @@ def agrupar_razon_no_termina(texto: str) -> str:
     if "gust" in t:
         return "No le gusta la comida"
     t = re.sub(r"^porque\s+", "", t)
+    return t.capitalize()
+
+
+def agrupar_razon_vianda(texto: str) -> str:
+    """Junta respuestas parecidas sobre por qué no come la vianda del colegio."""
+    t = str(texto).lower().strip().rstrip(".")
+    if "gust" in t:
+        return "No le gusta"
+    if "casa" in t:
+        return "Come o trae comida de su casa"
+    if "combi" in t:
+        return "A veces no llega por la combi"
+    if "quiere" in t:
+        return "No quiere"
+    if "otra raz" in t:
+        return "Otra razón"
     return t.capitalize()
 
 
@@ -477,7 +494,9 @@ def main() -> None:
                 detalle,
                 df_f["razon_no_vianda"].dropna(),
             ]).str.strip().str.rstrip(".")
-            razones_vianda = razones_vianda[razones_vianda != ""].str.capitalize()
+            razones_vianda = (
+                razones_vianda[razones_vianda != ""].apply(agrupar_razon_vianda)
+            )
 
             if not razones_vianda.empty:
                 barras(razones_vianda, "Razón", "barras_razones_vianda",
