@@ -340,63 +340,59 @@ def main() -> None:
     st.sidebar.caption(f"Registros filtrados: **{len(df_f)}** de {len(df)}")
 
     # --------------------------------------------------------
-    # Métricas principales (lo más importante del estudio)
+    # Participantes
     # --------------------------------------------------------
     total = len(df_f)
     sin_filtros = total == len(df)
 
-    def pct(mascara: pd.Series) -> float:
-        return float(mascara.mean() * 100) if total else 0.0
+    st.subheader("Participantes")
 
-    pct_no_vianda = pct(df_f["come_vianda"].eq("No"))
-    pct_carne_pollo = pct(
-        df_f["comida_deseada"].str.contains("carne|pollo", case=False, na=False)
-    )
-    pct_hambre = pct(df_f["hambre_despues"].eq("Sí"))
-
-    c1, c2, c3, c4 = st.columns(4)
-    c1.metric(
+    edades_vc = df_f["edad"].dropna().astype(int).value_counts().sort_index()
+    columnas_part = st.columns(1 + len(edades_vc))
+    columnas_part[0].metric(
         "Respondieron",
         f"{total} de {TOTAL_CURSO}" if sin_filtros else f"{total}",
     )
-    c2.metric("No come la vianda del colegio", f"{pct_no_vianda:.0f}%")
-    c3.metric("Quiere carne o pollo en la vianda", f"{pct_carne_pollo:.0f}%")
-    c4.metric("Tiene hambre después del colegio", f"{pct_hambre:.0f}%")
+    for columna, (edad, cantidad) in zip(columnas_part[1:], edades_vc.items()):
+        columna.metric(f"{edad} años", f"{cantidad}")
+
+    if total:
+        grados_txt = ", ".join(sorted(df_f["grado"].dropna().unique()))
+        st.caption(f"Estudiantes de {grados_txt}.")
+
+    st.divider()
 
     # --------------------------------------------------------
-    # Edades de los participantes
+    # Rutinas en números (lo central de la investigación)
     # --------------------------------------------------------
-    st.subheader("Edades de los participantes")
-    col_edad, col_resumen = st.columns([1, 2])
+    def pct(mascara: pd.Series) -> float:
+        return float(mascara.mean() * 100) if total else 0.0
 
-    with col_edad:
-        edades_vc = (
-            df_f["edad"].dropna().astype(int)
-            .value_counts().sort_index().reset_index()
-        )
-        edades_vc.columns = ["Edad", "Cantidad"]
-        edades_vc["Edad"] = edades_vc["Edad"].astype(str) + " años"
-        fig = px.bar(edades_vc, x="Edad", y="Cantidad", text="Cantidad",
-                     color_discrete_sequence=["#2196F3"])
-        fig.update_layout(height=250, xaxis_title=None,
-                          yaxis=dict(visible=False),
-                          margin=dict(t=10, b=10, l=10, r=10))
-        st.plotly_chart(fig, use_container_width=True, key="edades")
+    pct_merienda_apenas = pct(df_f["come_merienda"].eq("Sí"))
+    pct_hora_ayuda = pct(df_f["merienda_ayuda_hora"].eq("Sí"))
+    pct_hambre = pct(df_f["hambre_despues"].eq("Sí"))
+    pct_termina = pct(df_f["come_todo"].str.startswith("Siempre", na=False))
 
-    with col_resumen:
-        if total and pd.notna(df_f["edad"].min()):
-            grados_txt = ", ".join(sorted(df_f["grado"].dropna().unique()))
-            if sin_filtros:
-                quienes = (
-                    f"**{total}** de los **{TOTAL_CURSO}** estudiantes "
-                    f"de **{grados_txt}** respondieron"
-                )
-            else:
-                quienes = f"**{total}** estudiantes de **{grados_txt}**"
-            st.markdown(
-                f"{quienes}, "
-                f"de **{int(df_f['edad'].min())}** a **{int(df_f['edad'].max())}** años."
-            )
+    st.subheader("Rutinas en números")
+    c1, c2, c3, c4 = st.columns(4)
+    c1.metric(
+        "Come la merienda apenas la sirven",
+        f"{pct_merienda_apenas:.0f}%",
+    )
+    c2.metric(
+        "La merienda le marca la hora de salida",
+        f"{pct_hora_ayuda:.0f}%",
+        help="¿La hora de la merienda le ayuda a saber cuánto falta para irse a casa?",
+    )
+    c3.metric(
+        "Tiene hambre después del colegio",
+        f"{pct_hambre:.0f}%",
+    )
+    c4.metric(
+        "Siempre termina la comida",
+        f"{pct_termina:.0f}%",
+        help="Cuando come en el colegio, ¿come todo lo que le sirven? (respuesta: siempre)",
+    )
 
     st.divider()
 
