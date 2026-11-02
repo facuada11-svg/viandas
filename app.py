@@ -262,6 +262,83 @@ def grafico_hambre_conteo(data: pd.DataFrame, columna: str, key: str,
     st.plotly_chart(fig, use_container_width=True, key=key)
 
 
+def grafico_cruce_hambre(data: pd.DataFrame) -> None:
+    """Cruza vianda y merienda con el hambre después del colegio.
+
+    Muestra, dentro de cada grupo, qué porcentaje tiene hambre (Sí / A veces / No).
+    """
+    base = data[["come_vianda", "come_merienda", "hambre_despues"]].dropna().copy()
+    if base.empty:
+        st.info("Sin respuestas registradas.")
+        return
+
+    def grupo(fila) -> str:
+        vianda = fila["come_vianda"] == "Sí"
+        merienda = fila["come_merienda"] == "Sí"
+        if vianda and merienda:
+            return "Come la vianda y la merienda"
+        if vianda:
+            return "Come la vianda, pero no la merienda"
+        if merienda:
+            return "No come la vianda, pero sí la merienda"
+        return "No come ni la vianda ni la merienda"
+
+    orden_grupos = [
+        "Come la vianda y la merienda",
+        "Come la vianda, pero no la merienda",
+        "No come la vianda, pero sí la merienda",
+        "No come ni la vianda ni la merienda",
+    ]
+
+    base["Grupo"] = base.apply(grupo, axis=1)
+    base["Hambre"] = base["hambre_despues"].astype(str).str.rstrip(".")
+
+    conteo = base.groupby(["Grupo", "Hambre"]).size().reset_index(name="n")
+    conteo["total"] = conteo.groupby("Grupo")["n"].transform("sum")
+    conteo["Porcentaje"] = conteo["n"] / conteo["total"] * 100
+    conteo["Etiqueta"] = (
+        conteo["Grupo"] + " (n=" + conteo["total"].astype(str) + ")"
+    )
+    conteo["Texto"] = conteo["Porcentaje"].round().astype(int).astype(str) + "%"
+
+    etiquetas = dict(zip(conteo["Grupo"], conteo["Etiqueta"]))
+    orden_etiquetas = [etiquetas[g] for g in orden_grupos if g in etiquetas]
+
+    fig = px.bar(
+        conteo, x="Porcentaje", y="Etiqueta", color="Hambre",
+        orientation="h", text="Texto",
+        color_discrete_map={"Sí": "#E91E63", "A veces": "#FF9800", "No": "#4CAF50"},
+        category_orders={
+            "Etiqueta": orden_etiquetas,
+            "Hambre": ["Sí", "A veces", "No"],
+        },
+    )
+    fig.update_layout(
+        barmode="stack",
+        xaxis=dict(range=[0, 100], title="% de estudiantes de cada grupo"),
+        yaxis_title=None,
+        legend_title_text="¿Tiene hambre después del colegio?",
+    )
+    fig.update_yaxes(autorange="reversed")
+    st.plotly_chart(fig, use_container_width=True, key="cruce_hambre")
+
+    g = conteo[conteo["Grupo"] == "Come la vianda y la merienda"]
+    if not g.empty:
+        total_g = int(g["total"].iloc[0])
+        hambre_si = int(g.loc[g["Hambre"] == "Sí", "n"].sum())
+        hambre_a_veces = int(g.loc[g["Hambre"] == "A veces", "n"].sum())
+        st.markdown(
+            f"De los **{total_g}** estudiantes que comen la vianda y la merienda, "
+            f"**{hambre_si / total_g * 100:.0f}%** dice tener hambre después del colegio "
+            f"y **{hambre_a_veces / total_g * 100:.0f}%** dice que a veces."
+        )
+    st.caption(
+        "\"Come la merienda\" = la come apenas la sirven. Los porcentajes son "
+        "dentro de cada grupo; con pocos estudiantes (n) cambian mucho con una "
+        "sola respuesta."
+    )
+
+
 # Comidas del día: se buscan por raíz de la palabra para juntar variantes
 # ("Desayuno", "desayuna", "Desayuno (a veces xq se duerme)", etc.)
 COMIDAS_DIA = {
@@ -755,7 +832,13 @@ def main() -> None:
 
         st.divider()
 
-        # ---- 1) Quién es quién ----
+        # ---- 1) Cruce vianda + merienda (el gráfico del informe) ----
+        st.subheader("¿Tienen hambre después del colegio los que comen la vianda y la merienda?")
+        grafico_cruce_hambre(df_f)
+
+        st.divider()
+
+        # ---- 2) Quién es quién ----
         st.subheader("¿Quiénes tienen hambre?")
         st.info(
             "El cuestionario **no pregunta por qué** tienen hambre, así que no "
@@ -775,7 +858,7 @@ def main() -> None:
 
         st.divider()
 
-        # ---- 2) Comparador ----
+        # ---- 3) Comparador ----
         st.subheader("Comparar el hambre según…")
 
         df_h = df_f.copy()
