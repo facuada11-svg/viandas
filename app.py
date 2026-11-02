@@ -192,7 +192,12 @@ def motivo_no_vianda(fila) -> object:
 
 def grafico_hambre_segun(data: pd.DataFrame, columna: str, key: str,
                          orden: list = None) -> None:
-    """Porcentaje de hambre después del colegio dentro de cada grupo de `columna`."""
+    """Cantidad de estudiantes con hambre después del colegio, según `columna`.
+
+    Muestra solo a quienes tienen hambre (Sí / A veces), en números absolutos.
+    La etiqueta de cada grupo indica "x de y": x estudiantes con hambre
+    sobre y estudiantes del grupo.
+    """
     base = data[[columna, "hambre_despues"]].dropna().copy()
     if base.empty:
         st.info("Sin respuestas registradas.")
@@ -201,35 +206,55 @@ def grafico_hambre_segun(data: pd.DataFrame, columna: str, key: str,
     base["Grupo"] = base[columna].astype(str).str.strip().str.rstrip(".")
     base["Hambre"] = base["hambre_despues"].astype(str).str.rstrip(".")
 
-    conteo = base.groupby(["Grupo", "Hambre"]).size().reset_index(name="n")
-    conteo["total"] = conteo.groupby("Grupo")["n"].transform("sum")
-    conteo["Porcentaje"] = conteo["n"] / conteo["total"] * 100
-    conteo["Etiqueta"] = (
-        conteo["Grupo"] + " (n=" + conteo["total"].astype(str) + ")"
-    )
-    conteo["Texto"] = conteo["Porcentaje"].round().astype(int).astype(str) + "%"
+    totales = base.groupby("Grupo").size()
+    con_hambre = base[base["Hambre"].isin(["Sí", "A veces"])]
 
-    etiquetas = dict(zip(conteo["Grupo"], conteo["Etiqueta"]))
+    cuentas = (
+        con_hambre.groupby(["Grupo", "Hambre"]).size().reset_index(name="n")
+    )
+
+    # Los grupos donde nadie tiene hambre también se muestran (0 de y)
+    sin_hambre = [g for g in totales.index if g not in set(cuentas["Grupo"])]
+    if sin_hambre:
+        ceros = pd.DataFrame(
+            {"Grupo": sin_hambre, "Hambre": "Sí", "n": 0}
+        )
+        cuentas = pd.concat([cuentas, ceros], ignore_index=True)
+
+    cuentas["total"] = cuentas["Grupo"].map(totales)
+    cuentas["n_hambre"] = cuentas.groupby("Grupo")["n"].transform("sum")
+    cuentas["Etiqueta"] = (
+        cuentas["Grupo"]
+        + " ("
+        + cuentas["n_hambre"].astype(int).astype(str)
+        + " de "
+        + cuentas["total"].astype(int).astype(str)
+        + ")"
+    )
+    cuentas["Texto"] = cuentas["n"].apply(lambda v: str(int(v)) if v > 0 else "")
+
+    etiquetas = dict(zip(cuentas["Grupo"], cuentas["Etiqueta"]))
     if orden:
         grupos = [g for g in orden if g in etiquetas]
         grupos += [g for g in etiquetas if g not in grupos]
     else:
-        totales = conteo.groupby("Grupo")["total"].first()
-        grupos = totales.sort_values(ascending=False).index.tolist()
+        por_hambre = cuentas.groupby("Grupo")["n_hambre"].first()
+        grupos = por_hambre.sort_values(ascending=False).index.tolist()
     orden_etiquetas = [etiquetas[g] for g in grupos]
 
     fig = px.bar(
-        conteo, x="Porcentaje", y="Etiqueta", color="Hambre",
+        cuentas, x="n", y="Etiqueta", color="Hambre",
         orientation="h", text="Texto",
-        color_discrete_map={"Sí": "#E91E63", "A veces": "#FF9800", "No": "#4CAF50"},
+        color_discrete_map={"Sí": "#E91E63", "A veces": "#FF9800"},
         category_orders={
             "Etiqueta": orden_etiquetas,
-            "Hambre": ["Sí", "A veces", "No"],
+            "Hambre": ["Sí", "A veces"],
         },
     )
     fig.update_layout(
         barmode="stack",
-        xaxis=dict(range=[0, 100], title="% de estudiantes de cada grupo"),
+        xaxis=dict(title="Cantidad de estudiantes con hambre", dtick=1,
+                   rangemode="tozero"),
         yaxis_title=None,
         legend_title_text="¿Tiene hambre?",
         legend=dict(orientation="h", y=-0.35),
@@ -763,6 +788,12 @@ def main() -> None:
         st.divider()
         st.header("🕐 Rutina diaria")
 
+        # La hora de la merienda funciona como puente: introduce el tema de la rutina
+        st.subheader("¿La hora de la merienda le ayuda a saber cuánto falta para irse a casa?")
+        col_puente, _ = st.columns(2)
+        with col_puente:
+            torta(df_f["merienda_ayuda_hora"], "torta_merienda_hora")
+
         col_r1, col_r2 = st.columns(2)
 
         with col_r1:
@@ -780,17 +811,13 @@ def main() -> None:
             barras(comidas_dia, "Comida", "barras_cuales_comidas")
             st.caption("Cantidad de estudiantes que mencionan cada comida.")
 
-        st.subheader("¿La hora de la merienda le ayuda a saber cuánto falta para irse a casa?")
-        col_r3, _ = st.columns(2)
-        with col_r3:
-            torta(df_f["merienda_ayuda_hora"], "torta_merienda_hora")
-
     # ---------------- TAB 4 — ¿TIENE HAMBRE DESPUÉS DEL COLEGIO? ----------------
     with tab4:
         hambre_txt = df_f["hambre_despues"].dropna().astype(str).str.rstrip(".")
         n_hambre_si = int(hambre_txt.eq("Sí").sum())
         n_hambre_av = int(hambre_txt.eq("A veces").sum())
         n_hambre_no = int(hambre_txt.eq("No").sum())
+        n_con_hambre = n_hambre_si + n_hambre_av
 
         col_p, col_n = st.columns(2)
 
@@ -814,8 +841,9 @@ def main() -> None:
 
         st.subheader("¿Quiénes tienen hambre y por qué?")
         st.caption(
-            "Cada barra muestra qué porcentaje de ese grupo tiene hambre. Con pocos "
-            "estudiantes por grupo (n), los porcentajes son orientativos."
+            f"Se muestran solo los **{n_con_hambre}** estudiantes que tienen hambre "
+            "después del colegio (Sí o A veces). Entre paréntesis, al lado de cada "
+            "grupo: \"x de y\" = x estudiantes con hambre sobre y estudiantes del grupo."
         )
 
         df_h = df_f.copy()
