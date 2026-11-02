@@ -337,6 +337,21 @@ def analizar_verduras(texto: str):
     return [], encontradas
 
 
+def clasificar_tipo_razon(texto: str) -> str:
+    """Un solo tipo de razón por respuesta (para el gráfico de torta)."""
+    t = str(texto).lower()
+    si, no = analizar_verduras(t)
+    if si:
+        return "Come solo algunas verduras"
+    if re.search(r"sabor|textura|se ve|aspecto|olor", t):
+        return "No le gusta el sabor, la textura o el aspecto"
+    if re.search(r"prefiere|prefiero|come (un )?poco|poquito", t):
+        return "Prefiere otra comida o come poco"
+    if no:
+        return "No come ciertas verduras"
+    return "Otra razón"
+
+
 def clasificar_otras_razones(texto: str) -> list:
     """Agrupa las razones que no son una lista de verduras."""
     t = str(texto).lower().strip()
@@ -524,19 +539,44 @@ def main() -> None:
                 verduras_si += si
                 verduras_no += no
 
-            otras = razones.apply(clasificar_otras_razones).explode().dropna()
+            tipos = razones.apply(clasificar_tipo_razon)
 
-            col_v1, col_v2, col_v3 = st.columns(3)
+            col_v1, col_v2 = st.columns(2)
+
             with col_v1:
-                st.markdown("**🥗 Come solo algunas verduras**")
-                st.caption("Las que sí come:")
-                lista_conteo(verduras_si)
+                st.markdown("**Tipo de razón**")
+                vc_tipos = conteo(tipos, "Razón")
+                fig = px.pie(vc_tipos, names="Razón", values="Cantidad",
+                             color_discrete_sequence=COLORES, hole=0.45)
+                fig.update_traces(textinfo="value+percent")
+                fig.update_layout(legend=dict(orientation="h", y=-0.1))
+                st.plotly_chart(fig, use_container_width=True, key="torta_tipo_razon")
+
             with col_v2:
-                st.markdown("**🚫 Verduras que no come**")
-                lista_conteo(verduras_no)
-            with col_v3:
-                st.markdown("**💬 Razones que dan**")
-                lista_conteo(otras.tolist())
+                st.markdown("**Verduras que mencionan**")
+                filas = (
+                    [{"Verdura": v, "Condición": "La come"} for v in verduras_si]
+                    + [{"Verdura": v, "Condición": "No la come"} for v in verduras_no]
+                )
+                if filas:
+                    vv = (
+                        pd.DataFrame(filas)
+                        .groupby(["Verdura", "Condición"]).size()
+                        .reset_index(name="Cantidad")
+                    )
+                    fig = px.bar(
+                        vv, x="Cantidad", y="Verdura", color="Condición",
+                        orientation="h", text="Cantidad",
+                        color_discrete_map={"La come": "#4CAF50",
+                                            "No la come": "#E91E63"},
+                    )
+                    fig.update_yaxes(categoryorder="total ascending")
+                    fig.update_xaxes(dtick=1)
+                    fig.update_layout(legend_title_text="")
+                    st.plotly_chart(fig, use_container_width=True,
+                                    key="barras_verduras")
+                else:
+                    st.info("Ninguna respuesta nombra verduras.")
 
             st.caption(
                 f"Respuestas escritas por {len(razones)} estudiantes, "
