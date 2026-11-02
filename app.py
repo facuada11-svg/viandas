@@ -574,8 +574,8 @@ def main() -> None:
     tab1, tab2, tab3, tab4 = st.tabs(
         [
             "🥩 Alimentación y salud",
-            "🍱 La vianda del colegio",
-            "🕐 Merienda y rutina diaria",
+            "🍱 Vianda, merienda y rutina",
+            "🍽️ ¿Tiene hambre después del colegio?",
             "📋 Datos crudos",
         ]
     )
@@ -668,54 +668,10 @@ def main() -> None:
         if n_celiaquia == 0 and n_diabetes == 0:
             st.success("Ningún estudiante declaró tener celiaquía ni diabetes.")
 
-        st.subheader("¿Tienen hambre después del colegio los que comen la vianda y la merienda?")
-        grafico_cruce_hambre(df_f)
-
-        st.subheader("¿Quiénes tienen hambre y por qué?")
-
-        hambre_txt = df_f["hambre_despues"].dropna().astype(str).str.rstrip(".")
-        n_hambre_si = int(hambre_txt.eq("Sí").sum())
-        n_hambre_av = int(hambre_txt.eq("A veces").sum())
-        st.markdown(
-            f"**{n_hambre_si}** de {total} estudiantes dicen que sí tienen hambre "
-            f"después del colegio y **{n_hambre_av}** dicen que a veces."
-        )
-        st.caption(
-            "Cada barra muestra qué porcentaje de ese grupo tiene hambre. Con pocos "
-            "estudiantes por grupo (n), los porcentajes son orientativos."
-        )
-
-        df_h = df_f.copy()
-        df_h["edad_txt"] = df_h["edad"].apply(
-            lambda x: f"{int(x)} años" if pd.notna(x) else np.nan
-        )
-        if len(df_h):
-            df_h["motivo_vianda"] = df_h.apply(motivo_no_vianda, axis=1)
-        else:
-            df_h["motivo_vianda"] = np.nan
-        orden_edades = sorted(
-            df_h["edad_txt"].dropna().unique(), key=lambda s: int(s.split()[0])
-        )
-
-        col_h1, col_h2 = st.columns(2)
-        with col_h1:
-            st.markdown("**Según si termina la comida del colegio**")
-            grafico_hambre_segun(df_h, "come_todo", "hambre_segun_come_todo")
-        with col_h2:
-            st.markdown("**Según cuántas veces come al día**")
-            grafico_hambre_segun(df_h, "cantidad_comidas", "hambre_segun_cantidad")
-
-        col_h3, col_h4 = st.columns(2)
-        with col_h3:
-            st.markdown("**Según la edad**")
-            grafico_hambre_segun(df_h, "edad_txt", "hambre_segun_edad",
-                                 orden=orden_edades)
-        with col_h4:
-            st.markdown("**Según por qué no come la vianda** (solo quienes no la comen)")
-            grafico_hambre_segun(df_h, "motivo_vianda", "hambre_segun_motivo")
-
-    # ---------------- TAB 2 — LA VIANDA DEL COLEGIO ----------------
+    # ---------------- TAB 2 — VIANDA, MERIENDA Y RUTINA ----------------
     with tab2:
+        st.header("🍱 La vianda del colegio")
+
         col_a, col_b = st.columns(2)
 
         with col_a:
@@ -789,35 +745,33 @@ def main() -> None:
             barras(razones_no_termina, "Razón", "barras_razon_no_termina",
                    horizontal=True)
 
-    # ---------------- TAB 3 — MERIENDA Y RUTINA DIARIA ----------------
-    with tab3:
-        col_a, col_b = st.columns(2)
+        st.divider()
+        st.header("🥪 La merienda")
 
-        with col_a:
+        col_m1, col_m2, col_m3 = st.columns(3)
+
+        with col_m1:
             st.subheader("¿Sabe en qué momento del día sirven la merienda?")
             barras(df_f["momento_merienda"], "Momento", "barras_momento_merienda")
 
-        with col_b:
+        with col_m2:
             st.subheader("¿Come la merienda apenas la sirven?")
             torta(df_f["come_merienda"], "torta_come_merienda")
 
-        col_c, col_d = st.columns(2)
-
-        with col_c:
+        with col_m3:
             st.subheader("¿La hora de la merienda le ayuda a saber cuánto falta para irse a casa?")
             torta(df_f["merienda_ayuda_hora"], "torta_merienda_hora")
 
-        with col_d:
-            st.subheader("¿Tiene hambre después del colegio?")
-            torta(df_f["hambre_despues"], "torta_hambre")
+        st.divider()
+        st.header("🕐 Rutina diaria")
 
-        col_e, col_f = st.columns(2)
+        col_r1, col_r2 = st.columns(2)
 
-        with col_e:
+        with col_r1:
             st.subheader("¿Cuántas veces come al día?")
             barras(df_f["cantidad_comidas"], "Veces por día", "barras_cantidad_comidas")
 
-        with col_f:
+        with col_r2:
             st.subheader("¿Cuáles son esas comidas?")
             comidas_dia = (
                 df_f["cuales_comidas"]
@@ -827,6 +781,68 @@ def main() -> None:
             )
             barras(comidas_dia, "Comida", "barras_cuales_comidas")
             st.caption("Cantidad de estudiantes que mencionan cada comida.")
+
+    # ---------------- TAB 3 — ¿TIENE HAMBRE DESPUÉS DEL COLEGIO? ----------------
+    with tab3:
+        hambre_txt = df_f["hambre_despues"].dropna().astype(str).str.rstrip(".")
+        n_hambre_si = int(hambre_txt.eq("Sí").sum())
+        n_hambre_av = int(hambre_txt.eq("A veces").sum())
+        n_hambre_no = int(hambre_txt.eq("No").sum())
+
+        col_p, col_n = st.columns(2)
+
+        with col_p:
+            st.subheader("¿Tiene hambre después del colegio?")
+            torta(df_f["hambre_despues"], "torta_hambre")
+
+        with col_n:
+            st.subheader("En números")
+            n1, n2, n3 = st.columns(3)
+            n1.metric("Sí", f"{n_hambre_si} de {total}")
+            n2.metric("A veces", f"{n_hambre_av} de {total}")
+            n3.metric("No", f"{n_hambre_no} de {total}")
+
+        st.divider()
+
+        st.subheader("¿Tienen hambre después del colegio los que comen la vianda y la merienda?")
+        grafico_cruce_hambre(df_f)
+
+        st.divider()
+
+        st.subheader("¿Quiénes tienen hambre y por qué?")
+        st.caption(
+            "Cada barra muestra qué porcentaje de ese grupo tiene hambre. Con pocos "
+            "estudiantes por grupo (n), los porcentajes son orientativos."
+        )
+
+        df_h = df_f.copy()
+        df_h["edad_txt"] = df_h["edad"].apply(
+            lambda x: f"{int(x)} años" if pd.notna(x) else np.nan
+        )
+        if len(df_h):
+            df_h["motivo_vianda"] = df_h.apply(motivo_no_vianda, axis=1)
+        else:
+            df_h["motivo_vianda"] = np.nan
+        orden_edades = sorted(
+            df_h["edad_txt"].dropna().unique(), key=lambda s: int(s.split()[0])
+        )
+
+        col_h1, col_h2 = st.columns(2)
+        with col_h1:
+            st.markdown("**Según si termina la comida del colegio**")
+            grafico_hambre_segun(df_h, "come_todo", "hambre_segun_come_todo")
+        with col_h2:
+            st.markdown("**Según cuántas veces come al día**")
+            grafico_hambre_segun(df_h, "cantidad_comidas", "hambre_segun_cantidad")
+
+        col_h3, col_h4 = st.columns(2)
+        with col_h3:
+            st.markdown("**Según la edad**")
+            grafico_hambre_segun(df_h, "edad_txt", "hambre_segun_edad",
+                                 orden=orden_edades)
+        with col_h4:
+            st.markdown("**Según por qué no come la vianda** (solo quienes no la comen)")
+            grafico_hambre_segun(df_h, "motivo_vianda", "hambre_segun_motivo")
 
     # ---------------- TAB 4 — DATOS CRUDOS ----------------
     with tab4:
