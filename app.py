@@ -192,12 +192,7 @@ def motivo_no_vianda(fila) -> object:
 
 def grafico_hambre_segun(data: pd.DataFrame, columna: str, key: str,
                          orden: list = None) -> None:
-    """Cantidad de estudiantes con hambre después del colegio, según `columna`.
-
-    Muestra solo a quienes tienen hambre (Sí / A veces), en números absolutos.
-    La etiqueta de cada grupo indica "x de y": x estudiantes con hambre
-    sobre y estudiantes del grupo.
-    """
+    """Porcentaje de hambre después del colegio dentro de cada grupo de `columna`."""
     base = data[[columna, "hambre_despues"]].dropna().copy()
     if base.empty:
         st.info("Sin respuestas registradas.")
@@ -206,55 +201,35 @@ def grafico_hambre_segun(data: pd.DataFrame, columna: str, key: str,
     base["Grupo"] = base[columna].astype(str).str.strip().str.rstrip(".")
     base["Hambre"] = base["hambre_despues"].astype(str).str.rstrip(".")
 
-    totales = base.groupby("Grupo").size()
-    con_hambre = base[base["Hambre"].isin(["Sí", "A veces"])]
-
-    cuentas = (
-        con_hambre.groupby(["Grupo", "Hambre"]).size().reset_index(name="n")
+    conteo = base.groupby(["Grupo", "Hambre"]).size().reset_index(name="n")
+    conteo["total"] = conteo.groupby("Grupo")["n"].transform("sum")
+    conteo["Porcentaje"] = conteo["n"] / conteo["total"] * 100
+    conteo["Etiqueta"] = (
+        conteo["Grupo"] + " (n=" + conteo["total"].astype(str) + ")"
     )
+    conteo["Texto"] = conteo["Porcentaje"].round().astype(int).astype(str) + "%"
 
-    # Los grupos donde nadie tiene hambre también se muestran (0 de y)
-    sin_hambre = [g for g in totales.index if g not in set(cuentas["Grupo"])]
-    if sin_hambre:
-        ceros = pd.DataFrame(
-            {"Grupo": sin_hambre, "Hambre": "Sí", "n": 0}
-        )
-        cuentas = pd.concat([cuentas, ceros], ignore_index=True)
-
-    cuentas["total"] = cuentas["Grupo"].map(totales)
-    cuentas["n_hambre"] = cuentas.groupby("Grupo")["n"].transform("sum")
-    cuentas["Etiqueta"] = (
-        cuentas["Grupo"]
-        + " ("
-        + cuentas["n_hambre"].astype(int).astype(str)
-        + " de "
-        + cuentas["total"].astype(int).astype(str)
-        + ")"
-    )
-    cuentas["Texto"] = cuentas["n"].apply(lambda v: str(int(v)) if v > 0 else "")
-
-    etiquetas = dict(zip(cuentas["Grupo"], cuentas["Etiqueta"]))
+    etiquetas = dict(zip(conteo["Grupo"], conteo["Etiqueta"]))
     if orden:
         grupos = [g for g in orden if g in etiquetas]
         grupos += [g for g in etiquetas if g not in grupos]
     else:
-        por_hambre = cuentas.groupby("Grupo")["n_hambre"].first()
-        grupos = por_hambre.sort_values(ascending=False).index.tolist()
+        totales = conteo.groupby("Grupo")["total"].first()
+        grupos = totales.sort_values(ascending=False).index.tolist()
     orden_etiquetas = [etiquetas[g] for g in grupos]
 
     fig = px.bar(
-        cuentas, x="n", y="Etiqueta", color="Hambre",
+        conteo, x="Porcentaje", y="Etiqueta", color="Hambre",
         orientation="h", text="Texto",
-        color_discrete_map={"Sí": "#E91E63", "A veces": "#FF9800"},
+        color_discrete_map={"Sí": "#E91E63", "A veces": "#FF9800", "No": "#4CAF50"},
         category_orders={
             "Etiqueta": orden_etiquetas,
-            "Hambre": ["Sí", "A veces"],
+            "Hambre": ["Sí", "A veces", "No"],
         },
     )
     fig.update_layout(
         barmode="stack",
-        xaxis=dict(title="Cantidad de estudiantes con hambre", dtick=1,
-                   rangemode="tozero"),
+        xaxis=dict(range=[0, 100], title="% de estudiantes de cada grupo"),
         yaxis_title=None,
         legend_title_text="¿Tiene hambre?",
         legend=dict(orientation="h", y=-0.35),
@@ -817,7 +792,6 @@ def main() -> None:
         n_hambre_si = int(hambre_txt.eq("Sí").sum())
         n_hambre_av = int(hambre_txt.eq("A veces").sum())
         n_hambre_no = int(hambre_txt.eq("No").sum())
-        n_con_hambre = n_hambre_si + n_hambre_av
 
         col_p, col_n = st.columns(2)
 
@@ -841,9 +815,8 @@ def main() -> None:
 
         st.subheader("¿Quiénes tienen hambre y por qué?")
         st.caption(
-            f"Se muestran solo los **{n_con_hambre}** estudiantes que tienen hambre "
-            "después del colegio (Sí o A veces). Entre paréntesis, al lado de cada "
-            "grupo: \"x de y\" = x estudiantes con hambre sobre y estudiantes del grupo."
+            "Cada barra muestra qué porcentaje de ese grupo tiene hambre. Con pocos "
+            "estudiantes por grupo (n), los porcentajes son orientativos."
         )
 
         df_h = df_f.copy()
