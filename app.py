@@ -173,6 +173,71 @@ def lista_conteo(items: list) -> None:
         st.markdown(f"- {nombre}" + (f" ({n})" if n > 1 else ""))
 
 
+def motivo_no_vianda(fila) -> object:
+    """Motivo principal (una categoría) por el que un estudiante no come la vianda."""
+    if fila.get("come_vianda") != "No":
+        return np.nan
+    partes = []
+    detalle = fila.get("come_vianda_detalle")
+    if pd.notna(detalle):
+        partes.append(
+            re.sub(r"^\s*no\s*[,.:;-]*\s*", "", str(detalle), flags=re.IGNORECASE)
+        )
+    otra = fila.get("razon_no_vianda")
+    if pd.notna(otra):
+        partes.append(str(otra))
+    texto = " ".join(partes).strip().rstrip(".")
+    return agrupar_razon_vianda(texto) if texto else "Sin motivo indicado"
+
+
+def grafico_hambre_segun(data: pd.DataFrame, columna: str, key: str,
+                         orden: list = None) -> None:
+    """Porcentaje de hambre después del colegio dentro de cada grupo de `columna`."""
+    base = data[[columna, "hambre_despues"]].dropna().copy()
+    if base.empty:
+        st.info("Sin respuestas registradas.")
+        return
+
+    base["Grupo"] = base[columna].astype(str).str.strip().str.rstrip(".")
+    base["Hambre"] = base["hambre_despues"].astype(str).str.rstrip(".")
+
+    conteo = base.groupby(["Grupo", "Hambre"]).size().reset_index(name="n")
+    conteo["total"] = conteo.groupby("Grupo")["n"].transform("sum")
+    conteo["Porcentaje"] = conteo["n"] / conteo["total"] * 100
+    conteo["Etiqueta"] = (
+        conteo["Grupo"] + " (n=" + conteo["total"].astype(str) + ")"
+    )
+    conteo["Texto"] = conteo["Porcentaje"].round().astype(int).astype(str) + "%"
+
+    etiquetas = dict(zip(conteo["Grupo"], conteo["Etiqueta"]))
+    if orden:
+        grupos = [g for g in orden if g in etiquetas]
+        grupos += [g for g in etiquetas if g not in grupos]
+    else:
+        totales = conteo.groupby("Grupo")["total"].first()
+        grupos = totales.sort_values(ascending=False).index.tolist()
+    orden_etiquetas = [etiquetas[g] for g in grupos]
+
+    fig = px.bar(
+        conteo, x="Porcentaje", y="Etiqueta", color="Hambre",
+        orientation="h", text="Texto",
+        color_discrete_map={"Sí": "#E91E63", "A veces": "#FF9800", "No": "#4CAF50"},
+        category_orders={
+            "Etiqueta": orden_etiquetas,
+            "Hambre": ["Sí", "A veces", "No"],
+        },
+    )
+    fig.update_layout(
+        barmode="stack",
+        xaxis=dict(range=[0, 100], title="% de estudiantes de cada grupo"),
+        yaxis_title=None,
+        legend_title_text="¿Tiene hambre?",
+        legend=dict(orientation="h", y=-0.35),
+    )
+    fig.update_yaxes(autorange="reversed")
+    st.plotly_chart(fig, use_container_width=True, key=key)
+
+
 def grafico_cruce_hambre(data: pd.DataFrame) -> None:
     """Cruza vianda y merienda con el hambre después del colegio.
 
@@ -606,6 +671,49 @@ def main() -> None:
         st.subheader("¿Tienen hambre después del colegio los que comen la vianda y la merienda?")
         grafico_cruce_hambre(df_f)
 
+        st.subheader("¿Quiénes tienen hambre y por qué?")
+
+        hambre_txt = df_f["hambre_despues"].dropna().astype(str).str.rstrip(".")
+        n_hambre_si = int(hambre_txt.eq("Sí").sum())
+        n_hambre_av = int(hambre_txt.eq("A veces").sum())
+        st.markdown(
+            f"**{n_hambre_si}** de {total} estudiantes dicen que sí tienen hambre "
+            f"después del colegio y **{n_hambre_av}** dicen que a veces."
+        )
+        st.caption(
+            "Cada barra muestra qué porcentaje de ese grupo tiene hambre. Con pocos "
+            "estudiantes por grupo (n), los porcentajes son orientativos."
+        )
+
+        df_h = df_f.copy()
+        df_h["edad_txt"] = df_h["edad"].apply(
+            lambda x: f"{int(x)} años" if pd.notna(x) else np.nan
+        )
+        if len(df_h):
+            df_h["motivo_vianda"] = df_h.apply(motivo_no_vianda, axis=1)
+        else:
+            df_h["motivo_vianda"] = np.nan
+        orden_edades = sorted(
+            df_h["edad_txt"].dropna().unique(), key=lambda s: int(s.split()[0])
+        )
+
+        col_h1, col_h2 = st.columns(2)
+        with col_h1:
+            st.markdown("**Según si termina la comida del colegio**")
+            grafico_hambre_segun(df_h, "come_todo", "hambre_segun_come_todo")
+        with col_h2:
+            st.markdown("**Según cuántas veces come al día**")
+            grafico_hambre_segun(df_h, "cantidad_comidas", "hambre_segun_cantidad")
+
+        col_h3, col_h4 = st.columns(2)
+        with col_h3:
+            st.markdown("**Según la edad**")
+            grafico_hambre_segun(df_h, "edad_txt", "hambre_segun_edad",
+                                 orden=orden_edades)
+        with col_h4:
+            st.markdown("**Según por qué no come la vianda** (solo quienes no la comen)")
+            grafico_hambre_segun(df_h, "motivo_vianda", "hambre_segun_motivo")
+
     # ---------------- TAB 2 — LA VIANDA DEL COLEGIO ----------------
     with tab2:
         col_a, col_b = st.columns(2)
@@ -747,4 +855,4 @@ def main() -> None:
 # ============================================================
 # PUNTO DE ENTRADA
 # ============================================================
-main()  
+main()
