@@ -571,10 +571,11 @@ def main() -> None:
     # --------------------------------------------------------
     # Tabs
     # --------------------------------------------------------
-    tab1, tab2, tab3, tab4 = st.tabs(
+    tab1, tab2, tab3, tab4, tab5 = st.tabs(
         [
             "🥩 Alimentación y salud",
-            "🍱 Vianda, merienda y rutina",
+            "🍱 La vianda del colegio",
+            "🥪 Merienda y rutina",
             "🍽️ ¿Tiene hambre después del colegio?",
             "📋 Datos crudos",
         ]
@@ -668,7 +669,7 @@ def main() -> None:
         if n_celiaquia == 0 and n_diabetes == 0:
             st.success("Ningún estudiante declaró tener celiaquía ni diabetes.")
 
-    # ---------------- TAB 2 — VIANDA, MERIENDA Y RUTINA ----------------
+    # ---------------- TAB 2 — LA VIANDA DEL COLEGIO ----------------
     with tab2:
         st.header("🍱 La vianda del colegio")
 
@@ -745,10 +746,11 @@ def main() -> None:
             barras(razones_no_termina, "Razón", "barras_razon_no_termina",
                    horizontal=True)
 
-        st.divider()
+    # ---------------- TAB 3 — MERIENDA Y RUTINA ----------------
+    with tab3:
         st.header("🥪 La merienda")
 
-        col_m1, col_m2, col_m3 = st.columns(3)
+        col_m1, col_m2 = st.columns(2)
 
         with col_m1:
             st.subheader("¿Sabe en qué momento del día sirven la merienda?")
@@ -757,10 +759,6 @@ def main() -> None:
         with col_m2:
             st.subheader("¿Come la merienda apenas la sirven?")
             torta(df_f["come_merienda"], "torta_come_merienda")
-
-        with col_m3:
-            st.subheader("¿La hora de la merienda le ayuda a saber cuánto falta para irse a casa?")
-            torta(df_f["merienda_ayuda_hora"], "torta_merienda_hora")
 
         st.divider()
         st.header("🕐 Rutina diaria")
@@ -782,8 +780,13 @@ def main() -> None:
             barras(comidas_dia, "Comida", "barras_cuales_comidas")
             st.caption("Cantidad de estudiantes que mencionan cada comida.")
 
-    # ---------------- TAB 3 — ¿TIENE HAMBRE DESPUÉS DEL COLEGIO? ----------------
-    with tab3:
+        st.subheader("¿La hora de la merienda le ayuda a saber cuánto falta para irse a casa?")
+        col_r3, _ = st.columns(2)
+        with col_r3:
+            torta(df_f["merienda_ayuda_hora"], "torta_merienda_hora")
+
+    # ---------------- TAB 4 — ¿TIENE HAMBRE DESPUÉS DEL COLEGIO? ----------------
+    with tab4:
         hambre_txt = df_f["hambre_despues"].dropna().astype(str).str.rstrip(".")
         n_hambre_si = int(hambre_txt.eq("Sí").sum())
         n_hambre_av = int(hambre_txt.eq("A veces").sum())
@@ -844,8 +847,8 @@ def main() -> None:
             st.markdown("**Según por qué no come la vianda** (solo quienes no la comen)")
             grafico_hambre_segun(df_h, "motivo_vianda", "hambre_segun_motivo")
 
-    # ---------------- TAB 4 — DATOS CRUDOS ----------------
-    with tab4:
+    # ---------------- TAB 5 — DATOS CRUDOS ----------------
+    with tab5:
         st.subheader("📋 Dataset completo (filtrado)")
         st.dataframe(df_f, use_container_width=True, height=500)
 
