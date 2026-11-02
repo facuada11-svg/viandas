@@ -527,7 +527,11 @@ def main() -> None:
             st.subheader("¿Come vegetales?")
             torta(df_f["come_vegetales"], "torta_vegetales")
 
-        st.subheader("¿Por qué no come carne / vegetales?")
+        # Si todos comen carne, la pregunta es solo sobre vegetales
+        if df_f["come_carne"].eq("Sí").all():
+            st.subheader("¿Por qué no come vegetales?")
+        else:
+            st.subheader("¿Por qué no come carne / vegetales?")
         razones = pd.concat([
             df_f["razon_no_carne"].dropna(),
             df_f["razon_no_vegetales"].dropna(),
@@ -743,4 +747,4 @@ def main() -> None:
 # ============================================================
 # PUNTO DE ENTRADA
 # ============================================================
-main()
+main()  
