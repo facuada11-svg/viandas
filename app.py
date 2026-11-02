@@ -221,7 +221,7 @@ def tabla_perfil_hambre(data: pd.DataFrame) -> pd.DataFrame:
 
 
 def grafico_hambre_conteo(data: pd.DataFrame, columna: str, key: str,
-                          orden: list = None) -> None:
+                          orden: list = None, prefijo: str = "") -> None:
     """Barras con CANTIDAD de estudiantes (no %), apiladas por respuesta de hambre."""
     base = data[[columna, "hambre_despues"]].dropna().copy()
     if base.empty:
@@ -233,7 +233,8 @@ def grafico_hambre_conteo(data: pd.DataFrame, columna: str, key: str,
 
     cnt = base.groupby(["Grupo", "Hambre"]).size().reset_index(name="Estudiantes")
     tot = cnt.groupby("Grupo")["Estudiantes"].sum()
-    cnt["Etiqueta"] = cnt["Grupo"].map(lambda g: f"{g}  ({tot[g]} en total)")
+    pre = f"{prefijo}: " if prefijo else ""
+    cnt["Etiqueta"] = cnt["Grupo"].map(lambda g: f"{pre}{g}  ({tot[g]} estudiantes)")
 
     if orden:
         grupos = [g for g in orden if g in tot.index] + \
@@ -251,6 +252,7 @@ def grafico_hambre_conteo(data: pd.DataFrame, columna: str, key: str,
             "Hambre": ["Sí", "A veces", "No"],
         },
     )
+    fig.update_traces(textfont_size=16, textposition="inside")
     fig.update_layout(
         barmode="stack",
         xaxis=dict(title="Cantidad de estudiantes", dtick=1),
@@ -873,17 +875,23 @@ def main() -> None:
         )
 
         opciones = {
-            "Si come la vianda del colegio": "come_vianda",
-            "Por qué no come la vianda (solo quienes no la comen)": "motivo_vianda",
-            "Si come la merienda apenas la sirven": "come_merienda",
-            "Si termina la comida del colegio": "termina_txt",
-            "Cuántas veces come al día": "cantidad_comidas",
+            "Si come la vianda del colegio": ("come_vianda", "Come la vianda"),
+            "Por qué no come la vianda (solo quienes no la comen)":
+                ("motivo_vianda", "No come la vianda porque"),
+            "Si come la merienda apenas la sirven":
+                ("come_merienda", "Come la merienda apenas la sirven"),
+            "Si termina la comida del colegio":
+                ("termina_txt", "Termina la comida"),
+            "Cuántas veces come al día": ("cantidad_comidas", "Come"),
         }
         eleccion = st.selectbox("Elegí qué comparar", list(opciones))
-        grafico_hambre_conteo(df_h, opciones[eleccion], "hambre_comparador")
+        columna_sel, prefijo_sel = opciones[eleccion]
+        grafico_hambre_conteo(df_h, columna_sel, "hambre_comparador",
+                              prefijo=prefijo_sel)
         st.caption(
-            "Cada barra es un grupo; los colores muestran cuántos de ese grupo "
-            "tienen hambre. El número entre paréntesis es el tamaño del grupo."
+            "Cada barra es un grupo (lo que dice a la izquierda). Los colores "
+            "muestran cuántos de ese grupo tienen hambre: rosa = sí, naranja = "
+            "a veces, verde = no."
         )
 
     # ---------------- TAB 5 — DATOS CRUDOS ----------------
